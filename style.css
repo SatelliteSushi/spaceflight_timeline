@@ -1,0 +1,111 @@
+body {
+    margin: 0;
+    overflow: hidden;
+    background-color: #0a0a0a;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+#timeline-container {
+    flex: 1;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+#timeline {
+    height: 60vh; /* Leave space for CAS below */
+}
+
+#cas {
+    height: 20vh;
+    position: relative;
+    overflow: visible;
+    pointer-events: none;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+}
+
+.axis path,
+.axis line {
+    stroke: #444;
+}
+
+.axis text {
+    fill: #888;
+    font-family: 'Purista', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.launch-point {
+    fill: #1b89e4;
+    stroke: #0a0a0a;
+    stroke-width: 1;
+    cursor: pointer;
+    transition: r 0.2s;
+}
+
+.tooltip {
+    position: absolute;
+    background: rgba(20, 20, 20, 0.95);
+    color: #fff;
+    padding: 8px 12px;
+    border-radius: 4px;
+    pointer-events: none;
+    font-family: 'Purista', sans-serif;
+    font-size: 14px;
+    opacity: 0;
+    transition: opacity 0.2s;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* CAS System Styles */
+.cas-hierarchy {
+    position: absolute;
+    bottom: 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.cas-level {
+    font-family: 'Purista', sans-serif;
+    color: #fff;
+    white-space: nowrap;
+    transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.cas-current {
+    font-size: 2.2em;
+    opacity: 1;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.5);
+}
+
+.cas-parent {
+    font-size: 1.4em;
+    opacity: 0.7;
+}
+
+.cas-grandparent {
+    font-size: 1em;
+    opacity: 0.4;
+}
+
+.cas-label {
+    position: absolute;
+    left: 50%;
+    bottom: 20px;
+    transform: translateX(-50%);
+    font-family: 'Purista', sans-serif;
+    font-size: 24px;
+    color: #fff;
+    text-align: center;
+    opacity: 1;
+    transition: opacity 0.4s ease;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+}
