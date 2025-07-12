@@ -646,6 +646,7 @@ class SpaceflightTimeline {
             ruler.style.opacity = opacity;
             ruler.style.position = 'relative';
             rulersContainer.appendChild(ruler);
+            
             // Collect all tick dates for this bar
             let tickDates = [];
             if (interval.unit === 'decade') {
@@ -695,10 +696,15 @@ class SpaceflightTimeline {
                     current.setSeconds(current.getSeconds() + 1);
                 }
             }
+            
             // Render all normal ticks
             tickDates.forEach(tickDate => {
                 this._renderTickMark(tickDate, format, 1, showLabels, 0, interval, ruler, canvasWidth);
             });
+            
+            // Add clickable range bars for the entire visible time range
+            this._renderClickableRanges(this.timeRange.start, this.timeRange.end, interval, ruler, canvasWidth);
+            
             // Always show context labels for left and right edge
             let leftContext = null, rightContext = null;
             if (tickDates.length > 0) {
@@ -740,6 +746,195 @@ class SpaceflightTimeline {
                 ruler.appendChild(rightLabel);
             }
         });
+    }
+
+    _renderClickableRanges(startTime, endTime, interval, ruler, canvasWidth) {
+        // Generate all possible intervals for this time range
+        const intervals = this._generateTimeIntervals(startTime, endTime, interval);
+        
+        for (let i = 0; i < intervals.length - 1; i++) {
+            const startTick = intervals[i];
+            const endTick = intervals[i + 1];
+            const startX = this.timeToPixel(startTick);
+            const endX = this.timeToPixel(endTick);
+            
+            // Create clickable ranges for all segments, even those partially off-screen
+            const rangeBar = document.createElement('div');
+            rangeBar.className = 'clickable-range';
+            rangeBar.style.position = 'absolute';
+            rangeBar.style.height = '100%';
+            rangeBar.style.cursor = 'pointer';
+            rangeBar.style.zIndex = '5';
+            
+            // Handle positioning for off-screen ranges
+            let displayStartX = startX;
+            let displayWidth = endX - startX;
+            
+            // If the range is partially off-screen, adjust the display
+            if (startX < -50) {
+                displayStartX = -50;
+                displayWidth = Math.max(0, endX - (-50));
+            }
+            if (endX > canvasWidth + 50) {
+                displayWidth = Math.max(0, (canvasWidth + 50) - startX);
+            }
+            
+            // Only create the range bar if it has a visible width
+            if (displayWidth > 0) {
+                rangeBar.style.left = `${displayStartX}px`;
+                rangeBar.style.width = `${displayWidth}px`;
+                
+                // Store the time range data
+                rangeBar.dataset.startTime = startTick.getTime();
+                rangeBar.dataset.endTime = endTick.getTime();
+                rangeBar.dataset.intervalUnit = interval.unit;
+                
+                // Add hover effect
+                rangeBar.addEventListener('mouseenter', () => {
+                    rangeBar.style.backgroundColor = 'rgba(0, 212, 255, 0.1)';
+                    rangeBar.style.border = '1px solid rgba(0, 212, 255, 0.3)';
+                });
+                
+                rangeBar.addEventListener('mouseleave', () => {
+                    rangeBar.style.backgroundColor = 'transparent';
+                    rangeBar.style.border = 'none';
+                });
+                
+                // Add click handler
+                rangeBar.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    
+                    // Calculate where within the range the user clicked
+                    const clickX = e.offsetX;
+                    const rangeWidth = endX - startX;
+                    const clickRatio = clickX / displayWidth;
+                    
+                    // Calculate the actual time at the click position
+                    const clickTime = startTick.getTime() + (rangeWidth * clickRatio);
+                    const clickDate = new Date(clickTime);
+                    
+                    // Determine the appropriate zoom range based on the interval
+                    let zoomStart, zoomEnd;
+                    
+                    if (interval.unit === 'decade') {
+                        const decade = Math.floor(clickDate.getFullYear() / 10) * 10;
+                        zoomStart = new Date(decade, 0, 1);
+                        zoomEnd = new Date(decade + 10, 0, 1);
+                    } else if (interval.unit === 'year') {
+                        const year = clickDate.getFullYear();
+                        zoomStart = new Date(year, 0, 1);
+                        zoomEnd = new Date(year + 1, 0, 1);
+                    } else if (interval.unit === 'month') {
+                        const year = clickDate.getFullYear();
+                        const month = clickDate.getMonth();
+                        zoomStart = new Date(year, month, 1);
+                        zoomEnd = new Date(year, month + 1, 1);
+                    } else if (interval.unit === 'day') {
+                        const year = clickDate.getFullYear();
+                        const month = clickDate.getMonth();
+                        const day = clickDate.getDate();
+                        zoomStart = new Date(year, month, day);
+                        zoomEnd = new Date(year, month, day + 1);
+                    } else if (interval.unit === 'hour') {
+                        const year = clickDate.getFullYear();
+                        const month = clickDate.getMonth();
+                        const day = clickDate.getDate();
+                        const hour = clickDate.getHours();
+                        zoomStart = new Date(year, month, day, hour);
+                        zoomEnd = new Date(year, month, day, hour + 1);
+                    } else if (interval.unit === 'minute') {
+                        const year = clickDate.getFullYear();
+                        const month = clickDate.getMonth();
+                        const day = clickDate.getDate();
+                        const hour = clickDate.getHours();
+                        const minute = clickDate.getMinutes();
+                        zoomStart = new Date(year, month, day, hour, minute);
+                        zoomEnd = new Date(year, month, day, hour, minute + 1);
+                    } else if (interval.unit === 'second') {
+                        const year = clickDate.getFullYear();
+                        const month = clickDate.getMonth();
+                        const day = clickDate.getDate();
+                        const hour = clickDate.getHours();
+                        const minute = clickDate.getMinutes();
+                        const second = clickDate.getSeconds();
+                        zoomStart = new Date(year, month, day, hour, minute, second);
+                        zoomEnd = new Date(year, month, day, hour, minute, second + 1);
+                    }
+                    
+                    this.zoomToTimeRange(zoomStart, zoomEnd, interval.unit);
+                });
+                
+                ruler.appendChild(rangeBar);
+            }
+        }
+    }
+
+    _generateTimeIntervals(startTime, endTime, interval) {
+        const intervals = [];
+        let current = new Date(startTime);
+        
+        // Round to the appropriate interval
+        current = this.roundToInterval(current, interval);
+        
+        while (current <= endTime) {
+            intervals.push(new Date(current));
+            
+            // Move to next interval
+            if (interval.unit === 'decade') {
+                current.setFullYear(current.getFullYear() + 10);
+            } else if (interval.unit === 'year') {
+                current.setFullYear(current.getFullYear() + 1);
+            } else if (interval.unit === 'month') {
+                current.setMonth(current.getMonth() + 1);
+            } else if (interval.unit === 'day') {
+                current.setDate(current.getDate() + 1);
+            } else if (interval.unit === 'hour') {
+                current.setHours(current.getHours() + 1);
+            } else if (interval.unit === 'minute') {
+                current.setMinutes(current.getMinutes() + 1);
+            } else if (interval.unit === 'second') {
+                current.setSeconds(current.getSeconds() + 1);
+            }
+        }
+        
+        // Add the end time if it's not already included
+        if (intervals.length === 0 || intervals[intervals.length - 1] < endTime) {
+            intervals.push(new Date(endTime));
+        }
+        
+        return intervals;
+    }
+
+    zoomToTimeRange(startTime, endTime, intervalUnit) {
+        // Calculate the exact time range that was clicked
+        const timeDiff = endTime.getTime() - startTime.getTime();
+        
+        // Calculate the center of the selected range
+        const rangeCenter = new Date(startTime.getTime() + timeDiff / 2);
+        
+        // Set the target center to the center of the selected range
+        this.targetTimeCenter = rangeCenter;
+        
+        // Set the target time span to exactly frame the selected range
+        // Add a small amount of padding (5%) for visual comfort
+        const paddingFactor = 0.05;
+        this.targetTimeSpan = timeDiff * (1 + 2 * paddingFactor);
+        
+        // Ensure minimum and maximum zoom levels
+        const minTimeSpan = 60 * 60 * 1000; // 1 hour minimum
+        const maxTimeSpan = 100 * 365 * 24 * 60 * 60 * 1000; // 100 years maximum
+        this.targetTimeSpan = Math.max(minTimeSpan, Math.min(maxTimeSpan, this.targetTimeSpan));
+        
+        // Hide any open hover cards
+        this.hideHoverCard();
+        
+        // Start the smooth zoom animation
+        this.animateZoom();
+        
+        // Update the time info display
+        setTimeout(() => {
+            this.updateTimeInfo();
+        }, 100);
     }
 
     _renderTickMark(tickDate, format, opacity, showLabels, level, interval, ruler, canvasWidth) {
