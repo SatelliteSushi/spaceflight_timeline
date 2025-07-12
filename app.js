@@ -1203,6 +1203,20 @@ class SpaceflightTimeline {
             this.hideHoverCard();
         };
         
+        // Allow wheel events to pass through to the timeline for zooming
+        card.onwheel = (e) => {
+            e.stopPropagation();
+            // Pass the wheel event to the timeline canvas for zooming
+            const canvasRect = this.elements.timelineCanvas.getBoundingClientRect();
+            const mouseX = e.clientX - canvasRect.left;
+            this.isDragging = false;
+            this.panHistory = [];
+            this.panMomentum.inProgress = false;
+            this.justZoomed = true;
+            const delta = e.deltaY > 0 ? 1.1 : 0.9;
+            this.zoomAtPoint(mouseX, delta);
+        };
+        
         // Store the current launch for tracking
         this.currentHoverLaunch = launch;
 
