@@ -392,10 +392,10 @@ body, html {
 .launch-point-hitbox {
     position: absolute;
     width: 24px;
-    height: 24px;
+    height: 120px; /* Extended height to include hover card area */
     left: 50%;
     top: 50%;
-    transform: translate(-50%, -50%);
+    transform: translate(-50%, -50%); /* Keep original centering */
     z-index: 2;
     cursor: pointer;
     background: transparent;
@@ -475,7 +475,8 @@ body, html {
     opacity: 0;
     visibility: hidden;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    pointer-events: none;
+    pointer-events: auto;
+    cursor: pointer;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
     white-space: nowrap;
     left: 50%;
@@ -512,6 +513,12 @@ body, html {
 .hover-card.active {
     opacity: 1;
     visibility: visible;
+}
+
+.hover-card:hover {
+    border-color: rgba(0, 212, 255, 0.6);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(0, 212, 255, 0.3);
+    transform: translateX(-50%) translateY(-2px);
 }
 
 .hover-card .mission-name {
@@ -901,7 +908,7 @@ body, html {
 .launch-tag {
     position: absolute;
     left: 100%;
-    top: 100%;
+    top: 65%;
     transform: translate(0, 0) rotate(45deg);
     transform-origin: left top;
     background: rgba(7, 9, 12, 0.92);

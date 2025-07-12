@@ -1099,11 +1099,14 @@ class SpaceflightTimeline {
         nodePositions.forEach((node, i) => {
             const { x, launch } = node;
             const y = 50;
-            // Create hitbox
+            // Create hitbox - extend it upward to include hover card area
             const hitbox = document.createElement('div');
             hitbox.className = 'launch-point-hitbox';
             hitbox.style.left = `${x}px`;
             hitbox.style.top = `${y}%`;
+            hitbox.style.width = '24px';
+            hitbox.style.height = '120px'; // Extended height to include hover card area
+            hitbox.style.transform = 'translate(-50%, -50%)'; // Keep original centering
             hitbox.dataset.launchId = launch.id;
             hitbox.dataset.launchData = JSON.stringify(launch);
             // Create the visible point inside the hitbox
@@ -1160,6 +1163,7 @@ class SpaceflightTimeline {
             <div class="launch-date"><span>${this.formatDate(launchDate)}</span> <span style="color:#00d4ff;">${this.formatTime(launchDate)}</span></div>
             <div class="agency-name">${launch.launch_service_provider?.name || 'Unknown Agency'}</div>
             <div class="t0-countdown" style="margin-top:8px;font-family:'Orbitron',monospace;font-size:1.1em;color:#00d4ff;font-weight:700;"></div>
+            <div style="margin-top:8px;font-size:0.8rem;color:#00d4ff;opacity:0.7;text-align:center;">Click for details</div>
         `;
         
         // Calculate the position of the launch point
@@ -1180,6 +1184,25 @@ class SpaceflightTimeline {
         card.style.bottom = `${canvasRect.height - axisY + gap}px`;
         card.style.transform = 'translateX(-50%)';
         card.classList.add('active');
+        
+        // Make the card clickable to show launch details
+        card.onclick = (e) => {
+            e.stopPropagation();
+            this.showLaunchDetails(launch, e);
+        };
+        
+        // Add mouse events to keep card visible when hovering over it
+        card.onmouseenter = (e) => {
+            e.stopPropagation();
+            // Keep the card visible
+        };
+        
+        card.onmouseleave = (e) => {
+            e.stopPropagation();
+            // Hide the card when mouse leaves it
+            this.hideHoverCard();
+        };
+        
         // Store the current launch for tracking
         this.currentHoverLaunch = launch;
 
@@ -1570,6 +1593,21 @@ class SpaceflightTimeline {
         const canvasRect = this.elements.timelineCanvas.getBoundingClientRect();
         const mouseX = event.clientX - canvasRect.left;
         const mouseY = event.clientY - canvasRect.top;
+
+        // Check if mouse is over the hover card itself
+        const hoverCard = this.elements.hoverCard;
+        if (hoverCard.classList.contains('active')) {
+            const cardRect = hoverCard.getBoundingClientRect();
+            const isOverCard = event.clientX >= cardRect.left && 
+                              event.clientX <= cardRect.right &&
+                              event.clientY >= cardRect.top && 
+                              event.clientY <= cardRect.bottom;
+            
+            if (isOverCard) {
+                // Keep the hover card visible when mouse is over it
+                return;
+            }
+        }
 
         // Get all visible launch hitboxes
         const hitboxes = this.elements.launchPoints.querySelectorAll('.launch-point-hitbox');
