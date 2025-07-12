@@ -1237,21 +1237,17 @@ class SpaceflightTimeline {
 
     renderLaunchPoints() {
         // --- Animation Preparation ---
-        // Build a key for the current filter state
         const filterKey = JSON.stringify(this.filteredLaunches.map(l => l.id));
         const isFilterChange = filterKey !== this._lastFilterKey;
         this._lastFilterKey = filterKey;
 
-        // Get previous launch IDs (for animation)
         const prevIds = this._prevLaunchIds || [];
         const newIds = this.filteredLaunches.map(l => l.id);
         this._prevLaunchIds = newIds;
 
-        // Map for quick lookup
         const prevIdSet = new Set(prevIds);
         const newIdSet = new Set(newIds);
 
-        // Get all existing hitboxes by launch id
         const hitboxMap = {};
         this.elements.launchPoints.querySelectorAll('.launch-point-hitbox').forEach(hitbox => {
             const id = hitbox.dataset.launchId;
@@ -1260,30 +1256,32 @@ class SpaceflightTimeline {
 
         // --- Animate Out (removal) ---
         if (isFilterChange) {
-            let removeIndex = 0;
-            prevIds.forEach((id, i) => {
-                if (!newIdSet.has(id) && hitboxMap[id]) {
-                    const hitbox = hitboxMap[id];
-                    // Stagger delay for wave effect (left to right)
-                    const delay = removeIndex * 60;
-                    removeIndex++;
-                    setTimeout(() => {
-                        hitbox.classList.add('launch-animate-out');
-                        setTimeout(() => {
-                            if (hitbox.parentNode) hitbox.parentNode.removeChild(hitbox);
-                        }, 400);
-                    }, delay);
+            // Get x positions for removed nodes
+            const removedNodes = prevIds
+                .map(id => ({ id, hitbox: hitboxMap[id] }))
+                .filter(obj => obj.hitbox && !newIdSet.has(obj.id))
+                .map(obj => ({ id: obj.id, hitbox: obj.hitbox, x: parseFloat(obj.hitbox.style.left) }));
+            const minX = Math.min(...removedNodes.map(n => n.x), 0);
+            const maxX = Math.max(...removedNodes.map(n => n.x), 1);
+            const totalWaveDuration = 600; // ms
+            removedNodes.forEach(node => {
+                let delay = 0;
+                if (maxX !== minX) {
+                    delay = ((node.x - minX) / (maxX - minX)) * totalWaveDuration;
                 }
+                setTimeout(() => {
+                    node.hitbox.classList.add('launch-animate-out');
+                    setTimeout(() => {
+                        if (node.hitbox.parentNode) node.hitbox.parentNode.removeChild(node.hitbox);
+                    }, 400);
+                }, delay);
             });
         } else {
-            // If not a filter change, just remove all
             this.elements.launchPoints.innerHTML = '';
         }
 
         // --- Animate In (addition) ---
-        // Only add new nodes after filter change
         if (isFilterChange) {
-            // Sort launches by date
             const sortedLaunches = [...this.filteredLaunches].sort((a, b) => new Date(a.net) - new Date(b.net));
             const nodePositions = [];
             const minTagDistance = 40; // px
@@ -1294,20 +1292,21 @@ class SpaceflightTimeline {
                     nodePositions.push({ x, launch });
                 }
             });
-            // Precompute fade state for each tag
             const fadeStates = nodePositions.map((node, i) => {
                 let fade = false;
                 if (i > 0 && Math.abs(node.x - nodePositions[i - 1].x) < minTagDistance) fade = true;
                 if (i < nodePositions.length - 1 && Math.abs(node.x - nodePositions[i + 1].x) < minTagDistance) fade = true;
                 return fade;
             });
-            // Add new nodes
-            let addIndex = 0;
+            // Calculate min/max x for wave
+            const xs = nodePositions.filter((node) => !prevIdSet.has(node.launch.id)).map(node => node.x);
+            const minX = Math.min(...xs, 0);
+            const maxX = Math.max(...xs, 1);
+            const totalWaveDuration = 600; // ms
             nodePositions.forEach((node, i) => {
                 const { x, launch } = node;
                 const y = 50;
                 if (!prevIdSet.has(launch.id)) {
-                    // New node: animate in
                     const hitbox = document.createElement('div');
                     hitbox.className = 'launch-point-hitbox launch-animate-in';
                     hitbox.style.left = `${x}px`;
@@ -1316,18 +1315,15 @@ class SpaceflightTimeline {
                     hitbox.style.height = '120px';
                     hitbox.dataset.launchId = launch.id;
                     hitbox.dataset.launchData = JSON.stringify(launch);
-                    // Point
                     const point = document.createElement('div');
                     point.className = `launch-point ${this.getStatusClass(launch.status?.name)}`;
                     point.style.outline = '1px solid #101319';
                     hitbox.appendChild(point);
-                    // Tag
                     const tag = document.createElement('div');
                     tag.className = 'launch-tag';
                     tag.textContent = launch.launch_service_provider?.abbrev || launch.launch_service_provider?.name || '';
                     tag.style.opacity = fadeStates[i] ? '0.2' : '1';
                     hitbox.appendChild(tag);
-                    // Events
                     hitbox.addEventListener('click', (e) => this.showLaunchDetails(launch, e));
                     hitbox.addEventListener('wheel', (e) => {
                         e.preventDefault();
@@ -1342,24 +1338,23 @@ class SpaceflightTimeline {
                         const delta = e.deltaY > 0 ? 1.1 : 0.9;
                         this.zoomAtPoint(mouseX, delta);
                     }, { passive: false });
-                    // Stagger delay for wave effect (left to right)
-                    const delay = addIndex * 60;
-                    addIndex++;
+                    // Wave delay based on x position
+                    let delay = 0;
+                    if (maxX !== minX) {
+                        delay = ((x - minX) / (maxX - minX)) * totalWaveDuration;
+                    }
                     setTimeout(() => {
                         this.elements.launchPoints.appendChild(hitbox);
-                        // Trigger animation
                         setTimeout(() => {
                             hitbox.classList.remove('launch-animate-in');
                         }, 20);
                     }, delay);
                 }
             });
-            // Also add unchanged nodes (no animation)
             nodePositions.forEach((node, i) => {
                 const { x, launch } = node;
                 const y = 50;
                 if (prevIdSet.has(launch.id)) {
-                    // Unchanged node: just re-append
                     const hitbox = hitboxMap[launch.id];
                     if (hitbox) {
                         hitbox.style.left = `${x}px`;
@@ -1371,7 +1366,6 @@ class SpaceflightTimeline {
         } else {
             // Not a filter change: render as before (no animation)
             // ... existing code ...
-            // Sort launches by date
             const sortedLaunches = [...this.filteredLaunches].sort((a, b) => new Date(a.net) - new Date(b.net));
             const nodePositions = [];
             const minTagDistance = 40; // px
@@ -1382,7 +1376,6 @@ class SpaceflightTimeline {
                     nodePositions.push({ x, launch });
                 }
             });
-            // Precompute fade state for each tag
             const fadeStates = nodePositions.map((node, i) => {
                 let fade = false;
                 if (i > 0 && Math.abs(node.x - nodePositions[i - 1].x) < minTagDistance) fade = true;
@@ -1400,18 +1393,15 @@ class SpaceflightTimeline {
                 hitbox.style.height = '120px';
                 hitbox.dataset.launchId = launch.id;
                 hitbox.dataset.launchData = JSON.stringify(launch);
-                // Point
                 const point = document.createElement('div');
                 point.className = `launch-point ${this.getStatusClass(launch.status?.name)}`;
                 point.style.outline = '1px solid #101319';
                 hitbox.appendChild(point);
-                // Tag
                 const tag = document.createElement('div');
                 tag.className = 'launch-tag';
                 tag.textContent = launch.launch_service_provider?.abbrev || launch.launch_service_provider?.name || '';
                 tag.style.opacity = fadeStates[i] ? '0.2' : '1';
                 hitbox.appendChild(tag);
-                // Events
                 hitbox.addEventListener('click', (e) => this.showLaunchDetails(launch, e));
                 hitbox.addEventListener('wheel', (e) => {
                     e.preventDefault();
