@@ -8,6 +8,7 @@ class SpaceflightTimeline {
         this.isDragging = false;
         this.lastMouseX = 0;
         this.apiUrl = 'https://ll2.craigmouser.com/2.3.0/launches/upcoming/?format=json';
+        this.pastApiUrl = 'https://ll2.craigmouser.com/2.3.0/launches/previous/?format=json';
         
         // Timeline state
         this.timeRange = {
@@ -184,6 +185,89 @@ class SpaceflightTimeline {
                             "name": "Kennedy Space Center, Florida, USA"
                         }
                     }
+                },
+                // Add some past launches for testing
+                {
+                    "id": "past-1",
+                    "name": "Apollo 11",
+                    "status": {
+                        "id": 4,
+                        "name": "Success",
+                        "abbrev": "Success",
+                        "description": "Mission completed successfully."
+                    },
+                    "net": "1969-07-16T13:32:00Z",
+                    "launch_service_provider": {
+                        "id": 44,
+                        "name": "NASA",
+                        "abbrev": "NASA",
+                        "type": {"id": 1, "name": "Government"}
+                    },
+                    "rocket": {
+                        "id": 8663,
+                        "configuration": {
+                            "id": 29,
+                            "name": "Saturn V",
+                            "families": [],
+                            "full_name": "Saturn V",
+                            "variant": ""
+                        }
+                    },
+                    "mission": {
+                        "id": 7255,
+                        "name": "Apollo 11",
+                        "type": "Human Exploration",
+                        "description": "First human landing on the Moon. Neil Armstrong and Buzz Aldrin became the first humans to walk on the lunar surface."
+                    },
+                    "pad": {
+                        "id": 82,
+                        "name": "Launch Complex 39A",
+                        "location": {
+                            "id": 23,
+                            "name": "Kennedy Space Center, Florida, USA"
+                        }
+                    }
+                },
+                {
+                    "id": "past-2",
+                    "name": "Space Shuttle Discovery STS-31",
+                    "status": {
+                        "id": 4,
+                        "name": "Success",
+                        "abbrev": "Success",
+                        "description": "Mission completed successfully."
+                    },
+                    "net": "1990-04-24T12:33:00Z",
+                    "launch_service_provider": {
+                        "id": 44,
+                        "name": "NASA",
+                        "abbrev": "NASA",
+                        "type": {"id": 1, "name": "Government"}
+                    },
+                    "rocket": {
+                        "id": 8664,
+                        "configuration": {
+                            "id": 30,
+                            "name": "Space Shuttle",
+                            "families": [],
+                            "full_name": "Space Shuttle",
+                            "variant": "Discovery"
+                        }
+                    },
+                    "mission": {
+                        "id": 7256,
+                        "name": "Hubble Space Telescope Deployment",
+                        "type": "Science",
+                        "description": "Deployed the Hubble Space Telescope, which has revolutionized our understanding of the universe."
+                    },
+                    "pad": {
+                        "id": 82,
+                        "name": "Launch Complex 39A",
+                        "location": {
+                            "id": 23,
+                            "name": "Kennedy Space Center, Florida, USA"
+                        }
+                    }
                 }
             ]
         };
@@ -216,6 +300,8 @@ class SpaceflightTimeline {
                 agency: document.getElementById('agency-filter'),
                 status: document.getElementById('status-filter'),
                 dateRange: document.getElementById('date-range'),
+                startDate: document.getElementById('start-date'),
+                endDate: document.getElementById('end-date'),
                 search: document.getElementById('search')
             },
             timelineRulers: document.getElementById('timeline-rulers'),
@@ -228,7 +314,9 @@ class SpaceflightTimeline {
         // Filter events
         this.elements.filters.agency.addEventListener('change', () => this.applyFilters());
         this.elements.filters.status.addEventListener('change', () => this.applyFilters());
-        this.elements.filters.dateRange.addEventListener('change', () => this.applyFilters());
+        this.elements.filters.dateRange.addEventListener('change', () => this.handleDateRangeChange());
+        this.elements.filters.startDate.addEventListener('change', () => this.applyFilters());
+        this.elements.filters.endDate.addEventListener('change', () => this.applyFilters());
         this.elements.filters.search.addEventListener('input', () => this.applyFilters());
 
         // Control events
@@ -275,19 +363,40 @@ class SpaceflightTimeline {
         try {
             this.showLoading(true);
             
-            console.log('Fetching data from:', this.apiUrl);
-            const response = await fetch(this.apiUrl);
-            console.log('Response status:', response.status);
+            // Fetch both upcoming and past launches
+            console.log('Fetching upcoming launches from:', this.apiUrl);
+            const upcomingResponse = await fetch(this.apiUrl);
+            console.log('Upcoming response status:', upcomingResponse.status);
             
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+            if (!upcomingResponse.ok) {
+                throw new Error(`HTTP error! status: ${upcomingResponse.status}`);
             }
             
-            const data = await response.json();
-            console.log('API Response:', data);
+            const upcomingData = await upcomingResponse.json();
+            console.log('Upcoming API Response:', upcomingData);
             
-            this.launches = data.results || [];
-            console.log('Processed launches:', this.launches.length);
+            // Fetch past launches
+            console.log('Fetching past launches from:', this.pastApiUrl);
+            const pastResponse = await fetch(this.pastApiUrl);
+            console.log('Past response status:', pastResponse.status);
+            
+            let pastData = { results: [] };
+            if (pastResponse.ok) {
+                pastData = await pastResponse.json();
+                console.log('Past API Response:', pastData);
+            } else {
+                console.warn('Failed to fetch past launches, continuing with upcoming only');
+            }
+            
+            // Combine upcoming and past launches
+            this.launches = [
+                ...(upcomingData.results || []),
+                ...(pastData.results || [])
+            ];
+            
+            console.log('Total launches loaded:', this.launches.length);
+            console.log('Upcoming launches:', upcomingData.results?.length || 0);
+            console.log('Past launches:', pastData.results?.length || 0);
             
             if (this.launches.length === 0) {
                 console.warn('No launches found in the response');
@@ -300,10 +409,11 @@ class SpaceflightTimeline {
         } catch (error) {
             console.error('Error loading launches:', error);
             
-            // Try alternative API endpoint if the first one fails
+            // Try alternative API endpoints if the first ones fail
             if (this.apiUrl.includes('ll2.craigmouser.com')) {
-                console.log('Trying alternative API endpoint...');
+                console.log('Trying alternative API endpoints...');
                 this.apiUrl = 'https://ll.thespacedevs.com/2.3.0/launches/upcoming/?format=json';
+                this.pastApiUrl = 'https://ll.thespacedevs.com/2.3.0/launches/previous/?format=json';
                 this.loadLaunches();
                 return;
             }
@@ -345,12 +455,41 @@ class SpaceflightTimeline {
         const searchFilter = this.elements.filters.search.value.toLowerCase();
 
         const now = new Date();
-        let futureDate = new Date();
+        let startDate = new Date();
+        let endDate = new Date();
         
-        if (dateRangeFilter !== 'all') {
-            futureDate.setDate(now.getDate() + parseInt(dateRangeFilter));
+        // Handle different date range filters
+        if (dateRangeFilter.startsWith('past-')) {
+            // Past date ranges
+            const days = parseInt(dateRangeFilter.replace('past-', ''));
+            startDate.setDate(now.getDate() - days);
+            endDate = new Date(now); // Up to now
+        } else if (dateRangeFilter === 'all-time') {
+            // All launches (past and upcoming)
+            startDate = new Date('1969-01-01'); // Start from 1969
+            endDate = new Date('2050-01-01'); // Extend to 2050
+        } else if (dateRangeFilter === 'all') {
+            // All upcoming
+            startDate = new Date(now);
+            endDate.setFullYear(now.getFullYear() + 10); // 10 years into future
+        } else if (dateRangeFilter === 'custom') {
+            // Custom date range
+            const startDateStr = this.elements.filters.startDate.value;
+            const endDateStr = this.elements.filters.endDate.value;
+            
+            if (startDateStr && endDateStr) {
+                startDate = new Date(startDateStr + 'T00:00:00Z');
+                endDate = new Date(endDateStr + 'T23:59:59Z');
+            } else {
+                // If custom dates are not set, use default range
+                startDate = new Date(now);
+                endDate.setDate(now.getDate() + 30);
+            }
         } else {
-            futureDate.setFullYear(now.getFullYear() + 10); // 10 years into future
+            // Future date ranges
+            const days = parseInt(dateRangeFilter);
+            startDate = new Date(now);
+            endDate.setDate(now.getDate() + days);
         }
 
         this.filteredLaunches = this.launches.filter(launch => {
@@ -366,13 +505,13 @@ class SpaceflightTimeline {
 
             // Date range filter
             const launchDate = new Date(launch.net);
-            if (launchDate < now || launchDate > futureDate) {
+            if (launchDate < startDate || launchDate > endDate) {
                 return false;
             }
 
             // Search filter
             if (searchFilter) {
-                const searchText = `${launch.mission?.name || ''} ${launch.rocket?.configuration?.name || ''} ${launch.launch_service_provider?.name || ''}`.toLowerCase();
+                const searchText = `${launch.mission?.name || ''} ${launch.rocket?.configuration?.name || ''} ${launch.launch_service_provider?.name || ''} ${launch.name || ''}`.toLowerCase();
                 if (!searchText.includes(searchFilter)) {
                     return false;
                 }
@@ -383,6 +522,32 @@ class SpaceflightTimeline {
 
         this.updateTimeRange();
         this.smoothRenderTimeline();
+    }
+
+    handleDateRangeChange() {
+        const dateRangeValue = this.elements.filters.dateRange.value;
+        const customDateRange = document.getElementById('custom-date-range');
+        const customDateRangeEnd = document.getElementById('custom-date-range-end');
+        
+        if (dateRangeValue === 'custom') {
+            customDateRange.style.display = 'flex';
+            customDateRangeEnd.style.display = 'flex';
+            
+            // Set default dates (last 30 days to next 30 days)
+            const now = new Date();
+            const thirtyDaysAgo = new Date(now);
+            thirtyDaysAgo.setDate(now.getDate() - 30);
+            const thirtyDaysFromNow = new Date(now);
+            thirtyDaysFromNow.setDate(now.getDate() + 30);
+            
+            this.elements.filters.startDate.value = thirtyDaysAgo.toISOString().split('T')[0];
+            this.elements.filters.endDate.value = thirtyDaysFromNow.toISOString().split('T')[0];
+        } else {
+            customDateRange.style.display = 'none';
+            customDateRangeEnd.style.display = 'none';
+        }
+        
+        this.applyFilters();
     }
 
     updateTimeRange() {
@@ -1383,6 +1548,12 @@ class SpaceflightTimeline {
             return 'status-go';
         } else if (statusLower.includes('hold')) {
             return 'status-hold';
+        } else if (statusLower.includes('success')) {
+            return 'status-success';
+        } else if (statusLower.includes('failure')) {
+            return 'status-failure';
+        } else if (statusLower.includes('partial')) {
+            return 'status-partial-failure';
         } else {
             return 'status-tbd';
         }

@@ -96,6 +96,36 @@ body, html {
     color: #ffffff;
 }
 
+/* Custom date range styling */
+#custom-date-range,
+#custom-date-range-end {
+    transition: all 0.3s ease;
+}
+
+#custom-date-range input,
+#custom-date-range-end input {
+    padding: 8px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+    font-size: 0.9rem;
+    transition: all 0.3s ease;
+    border-radius: 4px;
+}
+
+#custom-date-range input:focus,
+#custom-date-range-end input:focus {
+    outline: none;
+    border-color: #00d4ff;
+    box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.2);
+}
+
+#custom-date-range input::-webkit-calendar-picker-indicator,
+#custom-date-range-end input::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    cursor: pointer;
+}
+
 .refresh-btn {
     padding: 8px 16px;
     background: linear-gradient(45deg, #00d4ff, #4ecdc4);
@@ -416,6 +446,21 @@ body, html {
     border-color: #ffa502;
 }
 
+.launch-point.status-success {
+    background: #00ff88;
+    border-color: #00ff88;
+}
+
+.launch-point.status-failure {
+    background: #ff4757;
+    border-color: #ff4757;
+}
+
+.launch-point.status-partial-failure {
+    background: #ffa502;
+    border-color: #ffa502;
+}
+
 /* Hover Card */
 .hover-card {
     position: absolute;
@@ -613,6 +658,24 @@ body, html {
     background: rgba(255, 71, 87, 0.2);
     color: #ff4757;
     border: 1px solid rgba(255, 71, 87, 0.3);
+}
+
+.status-success {
+    background: rgba(0, 255, 136, 0.2);
+    color: #00ff88;
+    border: 1px solid rgba(0, 255, 136, 0.3);
+}
+
+.status-failure {
+    background: rgba(255, 71, 87, 0.2);
+    color: #ff4757;
+    border: 1px solid rgba(255, 71, 87, 0.3);
+}
+
+.status-partial-failure {
+    background: rgba(255, 165, 2, 0.2);
+    color: #ffa502;
+    border: 1px solid rgba(255, 165, 2, 0.3);
 }
 
 /* Responsive Design */
