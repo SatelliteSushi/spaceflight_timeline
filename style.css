@@ -59,6 +59,7 @@ body, html {
     background: rgba(16, 20, 26, 0.8);
     backdrop-filter: blur(10px);
     border: 1px solid rgba(255, 255, 255, 0.1);
+    align-items: flex-end;
 }
 
 .filter-group {
@@ -66,6 +67,7 @@ body, html {
     flex-direction: column;
     gap: 5px;
     min-width: 150px;
+    justify-content: flex-end;
 }
 
 .filter-group label {
@@ -82,6 +84,9 @@ body, html {
     color: #ffffff;
     font-size: 0.9rem;
     transition: all 0.3s ease;
+    border-radius: 4px;
+    height: 40px;
+    box-sizing: border-box;
 }
 
 .filter-group select:focus,
@@ -127,25 +132,34 @@ body, html {
 }
 
 .refresh-btn {
-    padding: 8px 16px;
-    background: linear-gradient(45deg, #00d4ff, #4ecdc4);
-    border: none;
-    color: #ffffff;
+    padding: 0 20px;
+    background: rgba(7, 9, 12, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #00d4ff;
     font-weight: 500;
     cursor: pointer;
     transition: all 0.3s ease;
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-top: 20px;
+    height: 40px;
+    border-radius: 4px;
+    margin-top: 0;
+    box-sizing: border-box;
 }
 
 .refresh-btn:hover {
+    background: rgba(0, 212, 255, 0.08);
+    color: #4ecdc4;
+    border-color: #00d4ff;
+    box-shadow: 0 2px 8px rgba(0, 212, 255, 0.08);
     transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(0, 212, 255, 0.3);
 }
 
 .refresh-btn:active {
+    background: rgba(0, 212, 255, 0.15);
+    color: #00d4ff;
+    border-color: #00d4ff;
     transform: translateY(0);
 }
 
@@ -252,7 +266,7 @@ body, html {
     position: relative;
     z-index: 10;
     width: 100%;
-    pointer-events: none;
+    pointer-events: auto;
 }
 
 .timeline-ruler {
@@ -268,7 +282,7 @@ body, html {
     opacity: 0;
     transform: translateY(-10px);
     transition: opacity 0.4s cubic-bezier(0.4,0,0.2,1), transform 0.4s cubic-bezier(0.4,0,0.2,1);
-    pointer-events: none;
+    pointer-events: auto;
 }
 
 .timeline-ruler.active {
@@ -927,4 +941,45 @@ body, html {
     transition: opacity 0.2s;
     border: 1px solid rgba(0,212,255,0.12);
     text-shadow: 0 1px 2px #000a;
+}
+
+/* Clickable range bars */
+.clickable-range {
+    position: absolute;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    z-index: 5;
+    pointer-events: auto;
+}
+
+.clickable-range:hover {
+    background-color: rgba(0, 212, 255, 0.1) !important;
+    border: 1px solid rgba(0, 212, 255, 0.3) !important;
+    box-shadow: inset 0 0 0 1px rgba(0, 212, 255, 0.1);
+}
+
+.clickable-range:active {
+    background-color: rgba(0, 212, 255, 0.15) !important;
+    border: 1px solid rgba(0, 212, 255, 0.5) !important;
+    transform: scale(0.98);
+}
+
+/* Launch node animations for filter changes (fade + vertical translate) */
+.launch-point-hitbox.launch-animate-in {
+    opacity: 0;
+    transform: translate(-50%, 30%);
+    transition: opacity 0.4s cubic-bezier(0.4,0,0.2,1), transform 0.4s cubic-bezier(0.4,0,0.2,1);
+}
+.launch-point-hitbox:not(.launch-animate-in):not(.launch-animate-out) {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+    transition: opacity 0.4s cubic-bezier(0.4,0,0.2,1), transform 0.4s cubic-bezier(0.4,0,0.2,1);
+}
+.launch-point-hitbox.launch-animate-out {
+    opacity: 0;
+    transform: translate(-50%, -70%);
+    transition: opacity 0.4s cubic-bezier(0.4,0,0.2,1), transform 0.4s cubic-bezier(0.4,0,0.2,1);
+    pointer-events: none;
 }
