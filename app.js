@@ -1236,115 +1236,199 @@ class SpaceflightTimeline {
     }
 
     renderLaunchPoints() {
-        // Clear existing points
-        const existingPoints = this.elements.launchPoints.querySelectorAll('.launch-point-hitbox, .launch-point, .launch-tag');
-        existingPoints.forEach(point => point.remove());
-        
-        // Clear existing message
-        const existingMessage = this.elements.launchPoints.querySelector('.no-launches-message');
-        if (existingMessage) {
-            existingMessage.remove();
-        }
-        
-        // Check if current hover launch is still visible
-        if (this.currentHoverLaunch) {
-            const hoverLaunchDate = new Date(this.currentHoverLaunch.net);
-            const hoverX = this.timeToPixel(hoverLaunchDate);
-            const canvasWidth = this.elements.timelineCanvas.offsetWidth;
-            
-            // Hide hover card if the launch point is no longer visible
-            if (hoverX < -20 || hoverX > canvasWidth + 20) {
-                this.hideHoverCard();
-            }
-        }
-        
-        if (this.filteredLaunches.length === 0) {
-            // Show message when no launches in current view
-            const canvasWidth = this.elements.timelineCanvas.offsetWidth;
-            const centerX = canvasWidth / 2;
-            
-            const message = document.createElement('div');
-            message.className = 'no-launches-message';
-            message.style.cssText = `
-                position: absolute;
-                left: ${centerX}px;
-                top: 50%;
-                transform: translate(-50%, -50%);
-                text-align: center;
-                color: #b0b0b0;
-                font-size: 0.9rem;
-                pointer-events: none;
-            `;
-            message.innerHTML = `
-                <i class="fas fa-search" style="font-size: 1.5rem; margin-bottom: 8px; opacity: 0.5; display: block;"></i>
-                <div>No launches in this time range</div>
-            `;
-            this.elements.launchPoints.appendChild(message);
-            return;
-        }
-        
-        // Sort launches by date
-        const sortedLaunches = [...this.filteredLaunches].sort((a, b) => new Date(a.net) - new Date(b.net));
-        const nodePositions = [];
-        const minTagDistance = 40; // px
-        // First, collect all visible launches and their x positions
-        sortedLaunches.forEach((launch) => {
-            const launchDate = new Date(launch.net);
-            const x = this.timeToPixel(launchDate);
-            if (x >= -20 && x <= this.elements.timelineCanvas.offsetWidth + 20) {
-                nodePositions.push({ x, launch });
-            }
+        // --- Animation Preparation ---
+        // Build a key for the current filter state
+        const filterKey = JSON.stringify(this.filteredLaunches.map(l => l.id));
+        const isFilterChange = filterKey !== this._lastFilterKey;
+        this._lastFilterKey = filterKey;
+
+        // Get previous launch IDs (for animation)
+        const prevIds = this._prevLaunchIds || [];
+        const newIds = this.filteredLaunches.map(l => l.id);
+        this._prevLaunchIds = newIds;
+
+        // Map for quick lookup
+        const prevIdSet = new Set(prevIds);
+        const newIdSet = new Set(newIds);
+
+        // Get all existing hitboxes by launch id
+        const hitboxMap = {};
+        this.elements.launchPoints.querySelectorAll('.launch-point-hitbox').forEach(hitbox => {
+            const id = hitbox.dataset.launchId;
+            if (id) hitboxMap[id] = hitbox;
         });
-        // Precompute fade state for each tag
-        const fadeStates = nodePositions.map((node, i) => {
-            let fade = false;
-            if (i > 0 && Math.abs(node.x - nodePositions[i - 1].x) < minTagDistance) fade = true;
-            if (i < nodePositions.length - 1 && Math.abs(node.x - nodePositions[i + 1].x) < minTagDistance) fade = true;
-            return fade;
-        });
-        // Now render each node and tag with correct opacity from the start
-        nodePositions.forEach((node, i) => {
-            const { x, launch } = node;
-            const y = 50;
-            // Create hitbox - extend it upward to include hover card area
-            const hitbox = document.createElement('div');
-            hitbox.className = 'launch-point-hitbox';
-            hitbox.style.left = `${x}px`;
-            hitbox.style.top = `${y}%`;
-            hitbox.style.width = '24px';
-            hitbox.style.height = '120px'; // Extended height to include hover card area
-            hitbox.style.transform = 'translate(-50%, -50%)'; // Keep original centering
-            hitbox.dataset.launchId = launch.id;
-            hitbox.dataset.launchData = JSON.stringify(launch);
-            // Create the visible point inside the hitbox
-            const point = document.createElement('div');
-            point.className = `launch-point ${this.getStatusClass(launch.status?.name)}`;
-            point.style.outline = '1px solid #101319';
-            hitbox.appendChild(point);
-            // Create the diagonal tag
-            const tag = document.createElement('div');
-            tag.className = 'launch-tag';
-            tag.textContent = launch.launch_service_provider?.abbrev || launch.launch_service_provider?.name || '';
-            tag.style.opacity = fadeStates[i] ? '0.2' : '1';
-            hitbox.appendChild(tag);
-            // Add click events to hitbox (removed hover events)
-            hitbox.addEventListener('click', (e) => this.showLaunchDetails(launch, e));
-            // Handle wheel events on plot points to prevent panning
-            hitbox.addEventListener('wheel', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                const rect = hitbox.getBoundingClientRect();
-                const canvasRect = this.elements.timelineCanvas.getBoundingClientRect();
-                const mouseX = rect.left + rect.width / 2 - canvasRect.left;
-                this.isDragging = false;
-                this.panHistory = [];
-                this.panMomentum.inProgress = false;
-                this.justZoomed = true;
-                const delta = e.deltaY > 0 ? 1.1 : 0.9;
-                this.zoomAtPoint(mouseX, delta);
-            }, { passive: false });
-            this.elements.launchPoints.appendChild(hitbox);
-        });
+
+        // --- Animate Out (removal) ---
+        if (isFilterChange) {
+            let removeIndex = 0;
+            prevIds.forEach((id, i) => {
+                if (!newIdSet.has(id) && hitboxMap[id]) {
+                    const hitbox = hitboxMap[id];
+                    // Stagger delay for wave effect (left to right)
+                    const delay = removeIndex * 60;
+                    removeIndex++;
+                    setTimeout(() => {
+                        hitbox.classList.add('launch-animate-out');
+                        setTimeout(() => {
+                            if (hitbox.parentNode) hitbox.parentNode.removeChild(hitbox);
+                        }, 400);
+                    }, delay);
+                }
+            });
+        } else {
+            // If not a filter change, just remove all
+            this.elements.launchPoints.innerHTML = '';
+        }
+
+        // --- Animate In (addition) ---
+        // Only add new nodes after filter change
+        if (isFilterChange) {
+            // Sort launches by date
+            const sortedLaunches = [...this.filteredLaunches].sort((a, b) => new Date(a.net) - new Date(b.net));
+            const nodePositions = [];
+            const minTagDistance = 40; // px
+            sortedLaunches.forEach((launch) => {
+                const launchDate = new Date(launch.net);
+                const x = this.timeToPixel(launchDate);
+                if (x >= -20 && x <= this.elements.timelineCanvas.offsetWidth + 20) {
+                    nodePositions.push({ x, launch });
+                }
+            });
+            // Precompute fade state for each tag
+            const fadeStates = nodePositions.map((node, i) => {
+                let fade = false;
+                if (i > 0 && Math.abs(node.x - nodePositions[i - 1].x) < minTagDistance) fade = true;
+                if (i < nodePositions.length - 1 && Math.abs(node.x - nodePositions[i + 1].x) < minTagDistance) fade = true;
+                return fade;
+            });
+            // Add new nodes
+            let addIndex = 0;
+            nodePositions.forEach((node, i) => {
+                const { x, launch } = node;
+                const y = 50;
+                if (!prevIdSet.has(launch.id)) {
+                    // New node: animate in
+                    const hitbox = document.createElement('div');
+                    hitbox.className = 'launch-point-hitbox launch-animate-in';
+                    hitbox.style.left = `${x}px`;
+                    hitbox.style.top = `${y}%`;
+                    hitbox.style.width = '24px';
+                    hitbox.style.height = '120px';
+                    hitbox.dataset.launchId = launch.id;
+                    hitbox.dataset.launchData = JSON.stringify(launch);
+                    // Point
+                    const point = document.createElement('div');
+                    point.className = `launch-point ${this.getStatusClass(launch.status?.name)}`;
+                    point.style.outline = '1px solid #101319';
+                    hitbox.appendChild(point);
+                    // Tag
+                    const tag = document.createElement('div');
+                    tag.className = 'launch-tag';
+                    tag.textContent = launch.launch_service_provider?.abbrev || launch.launch_service_provider?.name || '';
+                    tag.style.opacity = fadeStates[i] ? '0.2' : '1';
+                    hitbox.appendChild(tag);
+                    // Events
+                    hitbox.addEventListener('click', (e) => this.showLaunchDetails(launch, e));
+                    hitbox.addEventListener('wheel', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        const rect = hitbox.getBoundingClientRect();
+                        const canvasRect = this.elements.timelineCanvas.getBoundingClientRect();
+                        const mouseX = rect.left + rect.width / 2 - canvasRect.left;
+                        this.isDragging = false;
+                        this.panHistory = [];
+                        this.panMomentum.inProgress = false;
+                        this.justZoomed = true;
+                        const delta = e.deltaY > 0 ? 1.1 : 0.9;
+                        this.zoomAtPoint(mouseX, delta);
+                    }, { passive: false });
+                    // Stagger delay for wave effect (left to right)
+                    const delay = addIndex * 60;
+                    addIndex++;
+                    setTimeout(() => {
+                        this.elements.launchPoints.appendChild(hitbox);
+                        // Trigger animation
+                        setTimeout(() => {
+                            hitbox.classList.remove('launch-animate-in');
+                        }, 20);
+                    }, delay);
+                }
+            });
+            // Also add unchanged nodes (no animation)
+            nodePositions.forEach((node, i) => {
+                const { x, launch } = node;
+                const y = 50;
+                if (prevIdSet.has(launch.id)) {
+                    // Unchanged node: just re-append
+                    const hitbox = hitboxMap[launch.id];
+                    if (hitbox) {
+                        hitbox.style.left = `${x}px`;
+                        hitbox.style.top = `${y}%`;
+                        this.elements.launchPoints.appendChild(hitbox);
+                    }
+                }
+            });
+        } else {
+            // Not a filter change: render as before (no animation)
+            // ... existing code ...
+            // Sort launches by date
+            const sortedLaunches = [...this.filteredLaunches].sort((a, b) => new Date(a.net) - new Date(b.net));
+            const nodePositions = [];
+            const minTagDistance = 40; // px
+            sortedLaunches.forEach((launch) => {
+                const launchDate = new Date(launch.net);
+                const x = this.timeToPixel(launchDate);
+                if (x >= -20 && x <= this.elements.timelineCanvas.offsetWidth + 20) {
+                    nodePositions.push({ x, launch });
+                }
+            });
+            // Precompute fade state for each tag
+            const fadeStates = nodePositions.map((node, i) => {
+                let fade = false;
+                if (i > 0 && Math.abs(node.x - nodePositions[i - 1].x) < minTagDistance) fade = true;
+                if (i < nodePositions.length - 1 && Math.abs(node.x - nodePositions[i + 1].x) < minTagDistance) fade = true;
+                return fade;
+            });
+            nodePositions.forEach((node, i) => {
+                const { x, launch } = node;
+                const y = 50;
+                const hitbox = document.createElement('div');
+                hitbox.className = 'launch-point-hitbox';
+                hitbox.style.left = `${x}px`;
+                hitbox.style.top = `${y}%`;
+                hitbox.style.width = '24px';
+                hitbox.style.height = '120px';
+                hitbox.dataset.launchId = launch.id;
+                hitbox.dataset.launchData = JSON.stringify(launch);
+                // Point
+                const point = document.createElement('div');
+                point.className = `launch-point ${this.getStatusClass(launch.status?.name)}`;
+                point.style.outline = '1px solid #101319';
+                hitbox.appendChild(point);
+                // Tag
+                const tag = document.createElement('div');
+                tag.className = 'launch-tag';
+                tag.textContent = launch.launch_service_provider?.abbrev || launch.launch_service_provider?.name || '';
+                tag.style.opacity = fadeStates[i] ? '0.2' : '1';
+                hitbox.appendChild(tag);
+                // Events
+                hitbox.addEventListener('click', (e) => this.showLaunchDetails(launch, e));
+                hitbox.addEventListener('wheel', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const rect = hitbox.getBoundingClientRect();
+                    const canvasRect = this.elements.timelineCanvas.getBoundingClientRect();
+                    const mouseX = rect.left + rect.width / 2 - canvasRect.left;
+                    this.isDragging = false;
+                    this.panHistory = [];
+                    this.panMomentum.inProgress = false;
+                    this.justZoomed = true;
+                    const delta = e.deltaY > 0 ? 1.1 : 0.9;
+                    this.zoomAtPoint(mouseX, delta);
+                }, { passive: false });
+                this.elements.launchPoints.appendChild(hitbox);
+            });
+        }
     }
 
     timeToPixel(time) {
