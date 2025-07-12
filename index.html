@@ -1,16 +1,109 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Space Timeline with CAS</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spaceflight Timeline</title>
     <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Roboto:wght@300;400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div id="timeline-container">
-        <div id="timeline"></div>
-        <div id="cas"></div>
+    <div class="container">
+        <div class="filters">
+            <div class="filter-group">
+                <label for="agency-filter">Agency:</label>
+                <select id="agency-filter">
+                    <option value="">All Agencies</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="status-filter">Status:</label>
+                <select id="status-filter">
+                    <option value="">All Statuses</option>
+                    <option value="Go for Launch">Go for Launch</option>
+                    <option value="TBD">TBD</option>
+                    <option value="Hold">Hold</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="date-range">Date Range:</label>
+                <select id="date-range">
+                    <option value="7">Next 7 days</option>
+                    <option value="30" selected>Next 30 days</option>
+                    <option value="90">Next 90 days</option>
+                    <option value="180">Next 6 months</option>
+                    <option value="365">Next year</option>
+                    <option value="all">All upcoming</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label for="search">Search:</label>
+                <input type="text" id="search" placeholder="Search missions...">
+            </div>
+            <button id="refresh-btn" class="refresh-btn">
+                <i class="fas fa-sync-alt"></i> Refresh
+            </button>
+            <button id="fallback-btn" class="refresh-btn" style="background: linear-gradient(45deg, #ff6b6b, #ff8e53);">
+                <i class="fas fa-database"></i> Load Offline Data
+            </button>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Loading spaceflight data...</p>
+        </div>
+
+        <div class="timeline-container" id="timeline-container">
+            <div class="timeline-header">
+                <div class="timeline-info">
+                    <span id="launch-count">0</span> launches found
+                    <span id="time-range" class="time-range-info"></span>
+                </div>
+                <div class="timeline-controls">
+                    <button id="zoom-in" class="control-btn" title="Zoom In"><i class="fas fa-search-plus"></i></button>
+                    <button id="zoom-out" class="control-btn" title="Zoom Out"><i class="fas fa-search-minus"></i></button>
+                    <button id="reset-view" class="control-btn" title="Reset View"><i class="fas fa-home"></i></button>
+                    <button id="fit-view" class="control-btn" title="Fit to View"><i class="fas fa-expand-arrows-alt"></i></button>
+                </div>
+            </div>
+            
+            <div class="timeline-wrapper" id="timeline-wrapper">
+                <div class="timeline-canvas" id="timeline-canvas">
+                    <div class="timeline-content" id="timeline-content">
+                        <div class="timeline-rulers" id="timeline-rulers"></div>
+                        <div class="timeline-axis" id="timeline-axis"></div>
+                        <div class="current-time-indicator" id="current-time-indicator"></div>
+                        <div class="center-line-indicator" id="center-line-indicator">
+                            <div class="center-line"></div>
+                            <div class="center-date-label" id="center-date-label"></div>
+                        </div>
+                        <div class="launch-points" id="launch-points"></div>
+                        <div class="hover-card" id="hover-card"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="timeline-footer">
+                <div class="zoom-info">
+                    <span id="zoom-level">1x</span> zoom
+                </div>
+                <div class="time-info">
+                    <span id="current-time-range"></span>
+                </div>
+            </div>
+        </div>
+
+        <div class="launch-details" id="launch-details">
+            <div class="details-header">
+                <h3 id="details-title">Launch Details</h3>
+                <button id="close-details" class="close-btn"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="details-content" id="details-content"></div>
+        </div>
     </div>
-    <div class="tooltip"></div>
-    <script src="https://d3js.org/d3.v7.min.js"></script>
+
     <script src="app.js"></script>
 </body>
 </html>
