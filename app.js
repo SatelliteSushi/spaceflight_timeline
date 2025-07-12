@@ -324,8 +324,6 @@ class SpaceflightTimeline {
 
         // Control events
         this.elements.refreshBtn.addEventListener('click', () => this.loadLaunches());
-        this.elements.fallbackBtn = document.getElementById('fallback-btn');
-        this.elements.fallbackBtn.addEventListener('click', () => this.loadFallbackData());
         this.elements.zoomIn.addEventListener('click', () => this.zoomIn());
         this.elements.zoomOut.addEventListener('click', () => this.zoomOut());
         this.elements.resetView.addEventListener('click', () => this.resetView());
@@ -466,7 +464,15 @@ class SpaceflightTimeline {
 
     applyFilters() {
         const agencyFilter = this.elements.filters.agency.value;
-        const statusFilter = this.elements.filters.status.value;
+        const statusFilter = this.elements.filters.status.value.trim().toLowerCase();
+        const statusAliases = {
+            "tbd": ["tbd", "to be determined", "to be confirmed"],
+            "go for launch": ["go for launch", "go"],
+            "hold": ["hold"],
+            "success": ["success"],
+            "failure": ["failure"],
+            "partial failure": ["partial failure"]
+        };
         const dateRangeFilter = this.elements.filters.dateRange.value;
         const searchFilter = this.elements.filters.search.value.toLowerCase();
 
@@ -514,9 +520,13 @@ class SpaceflightTimeline {
                 return false;
             }
 
-            // Status filter
-            if (statusFilter && launch.status?.name !== statusFilter) {
-                return false;
+            // Status filter (robust, using aliases)
+            if (statusFilter) {
+                const launchStatus = launch.status?.name?.trim().toLowerCase() || "";
+                const aliases = statusAliases[statusFilter] || [statusFilter];
+                if (!aliases.some(alias => launchStatus.includes(alias))) {
+                    return false;
+                }
             }
 
             // Date range filter
@@ -702,8 +712,10 @@ class SpaceflightTimeline {
                 this._renderTickMark(tickDate, format, 1, showLabels, 0, interval, ruler, canvasWidth);
             });
             
-            // Add clickable range bars for the entire visible time range
-            this._renderClickableRanges(this.timeRange.start, this.timeRange.end, interval, ruler, canvasWidth);
+            // Add clickable range bars for the entire visible time range, except for decade
+            if (interval.unit !== 'decade') {
+                this._renderClickableRanges(this.timeRange.start, this.timeRange.end, interval, ruler, canvasWidth);
+            }
             
             // Always show context labels for left and right edge
             let leftContext = null, rightContext = null;
@@ -1975,22 +1987,7 @@ class SpaceflightTimeline {
         this.smoothRenderTimeline();
     }
 
-    loadFallbackData() {
-        console.log('Loading fallback data manually...');
-        this.showLoading(true);
-        
-        setTimeout(() => {
-            const fallbackData = this.getFallbackData();
-            this.launches = fallbackData.results || [];
-            console.log('Loaded fallback data with', this.launches.length, 'launches');
-            
-            this.populateAgencyFilter();
-            this.applyFilters();
-            this.showLoading(false);
-            
-            this.showError('Loaded offline data successfully!');
-        }, 500);
-    }
+
 
     formatDate(date) {
         if (!date) return '';
