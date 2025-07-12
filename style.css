@@ -6,7 +6,7 @@
 
 body, html {
     font-family: 'Bai Jamjuree', sans-serif;
-    background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 50%, #16213e 100%);
+    background: linear-gradient(135deg, #050505 0%, #10141a 50%, #07090c 100%);
     color: #ffffff;
     min-height: 100vh;
     overflow-x: hidden;
@@ -56,7 +56,7 @@ body, html {
     gap: 15px;
     margin-bottom: 30px;
     padding: 20px;
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(16, 20, 26, 0.8);
     backdrop-filter: blur(10px);
     border: 1px solid rgba(255, 255, 255, 0.1);
 }
@@ -78,7 +78,7 @@ body, html {
 .filter-group input {
     padding: 8px 12px;
     border: 1px solid rgba(255, 255, 255, 0.2);
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(7, 9, 12, 0.8);
     color: #ffffff;
     font-size: 0.9rem;
     transition: all 0.3s ease;
@@ -92,7 +92,7 @@ body, html {
 }
 
 .filter-group select option {
-    background: #1a1a2e;
+    background: #07090c;
     color: #ffffff;
 }
 
@@ -106,7 +106,7 @@ body, html {
 #custom-date-range-end input {
     padding: 8px 12px;
     border: 1px solid rgba(255, 255, 255, 0.2);
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(7, 9, 12, 0.8);
     color: #ffffff;
     font-size: 0.9rem;
     transition: all 0.3s ease;
@@ -185,13 +185,13 @@ body, html {
 }
 
 .timeline-container {
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(16, 20, 26, 0.8);
     padding: 20px;
     backdrop-filter: blur(10px);
     border: 1px solid rgba(255, 255, 255, 0.1);
     margin-bottom: 20px;
-    min-height: 900px;
-    height: 900px;
+    min-height: 60vh;
+    height: 70vh;
     padding-bottom: 40px;
     overflow: hidden;
 }
@@ -239,8 +239,8 @@ body, html {
 .timeline-wrapper {
     position: relative;
     width: 100%;
-    height: 900px;
-    min-height: 900px;
+    height: 70vh;
+    min-height: 60vh;
     overflow: hidden;
 }
 
@@ -258,7 +258,7 @@ body, html {
 .timeline-ruler {
     position: relative;
     height: 32px;
-    background: rgba(255,255,255,0.03);
+    background: rgba(7,9,12,0.3);
     border-bottom: 1px solid rgba(255,255,255,0.08);
     display: flex;
     align-items: flex-end;
@@ -332,13 +332,13 @@ body, html {
 }
 
 /* Level-specific styling for stacked bars */
-.timeline-ruler.level-decade { background: rgba(0,212,255,0.04); }
-.timeline-ruler.level-year { background: rgba(0,212,255,0.03); }
-.timeline-ruler.level-month { background: rgba(255,255,255,0.02); }
-.timeline-ruler.level-day { background: rgba(255,255,255,0.01); }
-.timeline-ruler.level-hour { background: rgba(255,255,255,0.01); }
-.timeline-ruler.level-minute { background: rgba(255,255,255,0.01); }
-.timeline-ruler.level-second { background: rgba(255,255,255,0.01); }
+.timeline-ruler.level-decade { background: rgba(0,212,255,0.06); }
+.timeline-ruler.level-year { background: rgba(0,212,255,0.04); }
+.timeline-ruler.level-month { background: rgba(16,20,26,0.4); }
+.timeline-ruler.level-day { background: rgba(16,20,26,0.3); }
+.timeline-ruler.level-hour { background: rgba(16,20,26,0.2); }
+.timeline-ruler.level-minute { background: rgba(16,20,26,0.2); }
+.timeline-ruler.level-second { background: rgba(16,20,26,0.2); }
 
 /* Timeline Canvas */
 .timeline-canvas {
@@ -350,7 +350,7 @@ body, html {
     width: 100%;
     height: 100%;
     min-height: 0;
-    cursor: grab;
+    cursor: default !important;
     user-select: none;
     will-change: transform;
     overflow: hidden;
@@ -358,7 +358,7 @@ body, html {
 }
 
 .timeline-canvas:active {
-    cursor: grabbing;
+    cursor: default !important;
 }
 
 .timeline-canvas:focus {
@@ -464,7 +464,7 @@ body, html {
 /* Hover Card */
 .hover-card {
     position: absolute;
-    background: rgba(20, 20, 35, 0.95);
+    background: rgba(7, 9, 12, 0.95);
     backdrop-filter: blur(15px);
     border: 1px solid rgba(0, 212, 255, 0.3);
     padding: 16px;
@@ -494,7 +494,7 @@ body, html {
     height: 0;
     border-left: 8px solid transparent;
     border-right: 8px solid transparent;
-    border-top: 8px solid rgba(20, 20, 35, 0.95);
+    border-top: 8px solid rgba(7, 9, 12, 0.95);
 }
 
 .hover-card::after {
@@ -564,7 +564,7 @@ body, html {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%) scale(0.9);
-    background: rgba(26, 26, 46, 0.95);
+    background: rgba(7, 9, 12, 0.95);
     backdrop-filter: blur(20px);
     border: 1px solid rgba(255, 255, 255, 0.1);
     padding: 0;
@@ -576,6 +576,7 @@ body, html {
     opacity: 0;
     visibility: hidden;
     transition: all 0.3s ease;
+    pointer-events: auto;
 }
 
 .launch-details.active {
@@ -704,7 +705,8 @@ body, html {
     }
     
     .timeline-wrapper {
-        height: 300px;
+        height: 50vh;
+        min-height: 40vh;
     }
     
     .launch-details {
@@ -725,7 +727,8 @@ body, html {
     }
     
     .timeline-wrapper {
-        height: 250px;
+        height: 40vh;
+        min-height: 30vh;
     }
     
     .launch-point {
@@ -772,8 +775,8 @@ body, html {
     transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Smooth hover transitions */
-.launch-point:hover {
+/* Smooth hover transitions - now handled by JavaScript */
+.launch-point.hovered {
     transform: translate(-50%, -50%) scale(1.2);
     box-shadow: 0 0 15px rgba(0, 212, 255, 0.8);
     z-index: 10;
@@ -842,7 +845,7 @@ body, html {
     position: absolute;
     left: 8px;
     top: 75%;
-    background: rgba(0, 0, 0, 0.7);
+    background: rgba(7, 9, 12, 0.9);
     color: #ffffff;
     padding: 4px 8px;
     border-radius: 4px;
@@ -892,4 +895,29 @@ body, html {
     opacity: 0.85;
     text-shadow: 0 1px 2px #000a;
     user-select: none;
+}
+
+/* Diagonal launch provider tag */
+.launch-tag {
+    position: absolute;
+    left: 100%;
+    top: 100%;
+    transform: translate(0, 0) rotate(45deg);
+    transform-origin: left top;
+    background: rgba(7, 9, 12, 0.92);
+    color: #fff;
+    font-size: 0.85rem;
+    font-family: 'Orbitron', monospace;
+    font-weight: 700;
+    padding: 2px 10px 2px 6px;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.18);
+    pointer-events: none;
+    white-space: nowrap;
+    letter-spacing: 0.04em;
+    z-index: 20;
+    opacity: 0.2;
+    transition: opacity 0.2s;
+    border: 1px solid rgba(0,212,255,0.12);
+    text-shadow: 0 1px 2px #000a;
 }

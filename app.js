@@ -9,6 +9,8 @@ class SpaceflightTimeline {
         this.lastMouseX = 0;
         this.apiUrl = 'https://ll2.craigmouser.com/2.3.0/launches/upcoming/?format=json';
         this.pastApiUrl = 'https://ll2.craigmouser.com/2.3.0/launches/previous/?format=json';
+        // Time zone support
+        this.selectedTimeZone = localStorage.getItem('timelineTimeZone') || 'local';
         
         // Timeline state
         this.timeRange = {
@@ -30,8 +32,8 @@ class SpaceflightTimeline {
         };
         
         // Infinite timeline support
-        this.baseTime = new Date('1969-01-01'); // Start from 1969
-        this.maxTime = new Date('2050-01-01'); // Extend to 2050
+        this.baseTime = new Date('0000-01-01'); // Start from year 0
+        this.maxTime = new Date('5000-01-01'); // Extend to year 5000
         this.currentTimeCenter = new Date(); // Center of current view
         this.timeSpan = 30 * 24 * 60 * 60 * 1000; // 30 days default view
         
@@ -302,7 +304,8 @@ class SpaceflightTimeline {
                 dateRange: document.getElementById('date-range'),
                 startDate: document.getElementById('start-date'),
                 endDate: document.getElementById('end-date'),
-                search: document.getElementById('search')
+                search: document.getElementById('search'),
+                timezone: document.getElementById('timezone-select'),
             },
             timelineRulers: document.getElementById('timeline-rulers'),
             centerLineIndicator: document.getElementById('center-line-indicator'),
@@ -331,7 +334,11 @@ class SpaceflightTimeline {
         // Timeline interaction events
         this.elements.timelineCanvas.addEventListener('wheel', (event) => this.handleWheel(event), { passive: false });
         this.elements.timelineCanvas.addEventListener('mousedown', (e) => this.handleMouseDown(e));
-        this.elements.timelineCanvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
+        this.elements.timelineCanvas.addEventListener('mousemove', (e) => {
+            // Handle both panning and hover detection
+            this.handleMouseMove(e);
+            this.handleTimelineMouseMove(e);
+        });
         this.elements.timelineCanvas.addEventListener('mouseup', () => this.handleMouseUp());
         this.elements.timelineCanvas.addEventListener('mouseleave', () => this.handleMouseUp());
         
@@ -357,6 +364,15 @@ class SpaceflightTimeline {
 
         // Window resize
         window.addEventListener('resize', () => this.handleResize());
+
+        // Time zone change event
+        this.elements.filters.timezone.addEventListener('change', (e) => {
+            this.selectedTimeZone = e.target.value;
+            localStorage.setItem('timelineTimeZone', this.selectedTimeZone);
+            this.smoothRenderTimeline();
+            if (this.selectedLaunch) this.showLaunchDetails(this.selectedLaunch);
+            if (this.currentHoverLaunch) this.showHoverCard(null, this.currentHoverLaunch);
+        });
     }
 
     async loadLaunches() {
@@ -797,12 +813,12 @@ class SpaceflightTimeline {
 
         // Increased minPixelsPerMark for better performance - second tick marks appear later
         const allIntervals = [
-            { unit: 'decade', value: 1, minPixelsPerMark: 400, format: 'decade', subdivisions: 10 },
-            { unit: 'year', value: 1, minPixelsPerMark: 250, format: 'year', subdivisions: 12 },
-            { unit: 'month', value: 1, minPixelsPerMark: 150, format: 'month', subdivisions: 'days' },
+            { unit: 'decade', value: 1, minPixelsPerMark: 200, format: 'decade', subdivisions: 10 },
+            { unit: 'year', value: 1, minPixelsPerMark: 125, format: 'year', subdivisions: 12 },
+            { unit: 'month', value: 1, minPixelsPerMark: 75, format: 'month', subdivisions: 'days' },
             { unit: 'day', value: 1, minPixelsPerMark: 60, format: 'day', subdivisions: 24 },
-            { unit: 'hour', value: 1, minPixelsPerMark: 30, format: 'hour', subdivisions: 60 },
-            { unit: 'minute', value: 1, minPixelsPerMark: 15, format: 'minute', subdivisions: 60 },
+            { unit: 'hour', value: 1, minPixelsPerMark: 60, format: 'hour', subdivisions: 60 },
+            { unit: 'minute', value: 1, minPixelsPerMark: 30, format: 'minute', subdivisions: 60 },
             { unit: 'second', value: 1, minPixelsPerMark: 8, format: 'second', subdivisions: 1 }
         ];
 
@@ -830,8 +846,8 @@ class SpaceflightTimeline {
             // For granular units, fade in more slowly (require more space)
             let fadeStart = minPixelsPerMark * 0.8;
             let fadeEnd = minPixelsPerMark;
-            if (unit === 'hour') { fadeStart = 12; fadeEnd = 20; }
-            if (unit === 'minute') { fadeStart = 8; fadeEnd = 15; } // More space required for better performance
+            if (unit === 'hour') { fadeStart = 24; fadeEnd = 40; }
+            if (unit === 'minute') { fadeStart = 16; fadeEnd = 30; } // More space required for better performance
             if (unit === 'second') { fadeStart = 3; fadeEnd = 6; }
 
             if (pixelsPerMark >= fadeEnd) {
@@ -1014,7 +1030,7 @@ class SpaceflightTimeline {
 
     renderLaunchPoints() {
         // Clear existing points
-        const existingPoints = this.elements.launchPoints.querySelectorAll('.launch-point-hitbox, .launch-point');
+        const existingPoints = this.elements.launchPoints.querySelectorAll('.launch-point-hitbox, .launch-point, .launch-tag');
         existingPoints.forEach(point => point.remove());
         
         // Clear existing message
@@ -1062,55 +1078,62 @@ class SpaceflightTimeline {
         
         // Sort launches by date
         const sortedLaunches = [...this.filteredLaunches].sort((a, b) => new Date(a.net) - new Date(b.net));
-        
-        sortedLaunches.forEach((launch, index) => {
+        const nodePositions = [];
+        const minTagDistance = 40; // px
+        // First, collect all visible launches and their x positions
+        sortedLaunches.forEach((launch) => {
             const launchDate = new Date(launch.net);
             const x = this.timeToPixel(launchDate);
-            const y = 50; // Center of the timeline
-            
-            // Show points that are within or near the visible area
             if (x >= -20 && x <= this.elements.timelineCanvas.offsetWidth + 20) {
-                // Create hitbox
-                const hitbox = document.createElement('div');
-                hitbox.className = 'launch-point-hitbox';
-                hitbox.style.left = `${x}px`;
-                hitbox.style.top = `${y}%`;
-                hitbox.dataset.launchIndex = index;
-
-                // Create the visible point inside the hitbox
-                const point = document.createElement('div');
-                point.className = `launch-point ${this.getStatusClass(launch.status?.name)}`;
-                // No need to set left/top on point, it's centered in hitbox
-                hitbox.appendChild(point);
-
-                // Add hover/click events to hitbox
-                hitbox.addEventListener('mouseenter', (e) => this.showHoverCard(e, launch));
-                hitbox.addEventListener('mouseleave', () => this.hideHoverCard());
-                hitbox.addEventListener('click', () => this.showLaunchDetails(launch));
-                
-                // Handle wheel events on plot points to prevent panning
-                hitbox.addEventListener('wheel', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    
-                    // Manually trigger zoom at the plot point location
-                    const rect = hitbox.getBoundingClientRect();
-                    const canvasRect = this.elements.timelineCanvas.getBoundingClientRect();
-                    const mouseX = rect.left + rect.width / 2 - canvasRect.left;
-                    
-                    // Ensure we're not in a dragging state
-                    this.isDragging = false;
-                    this.panHistory = [];
-                    this.panMomentum.inProgress = false;
-                    this.justZoomed = true;
-                    
-                    // Reverse the scroll direction
-                    const delta = e.deltaY > 0 ? 1.1 : 0.9;
-                    this.zoomAtPoint(mouseX, delta);
-                }, { passive: false });
-
-                this.elements.launchPoints.appendChild(hitbox);
+                nodePositions.push({ x, launch });
             }
+        });
+        // Precompute fade state for each tag
+        const fadeStates = nodePositions.map((node, i) => {
+            let fade = false;
+            if (i > 0 && Math.abs(node.x - nodePositions[i - 1].x) < minTagDistance) fade = true;
+            if (i < nodePositions.length - 1 && Math.abs(node.x - nodePositions[i + 1].x) < minTagDistance) fade = true;
+            return fade;
+        });
+        // Now render each node and tag with correct opacity from the start
+        nodePositions.forEach((node, i) => {
+            const { x, launch } = node;
+            const y = 50;
+            // Create hitbox
+            const hitbox = document.createElement('div');
+            hitbox.className = 'launch-point-hitbox';
+            hitbox.style.left = `${x}px`;
+            hitbox.style.top = `${y}%`;
+            hitbox.dataset.launchId = launch.id;
+            hitbox.dataset.launchData = JSON.stringify(launch);
+            // Create the visible point inside the hitbox
+            const point = document.createElement('div');
+            point.className = `launch-point ${this.getStatusClass(launch.status?.name)}`;
+            point.style.outline = '1px solid #101319';
+            hitbox.appendChild(point);
+            // Create the diagonal tag
+            const tag = document.createElement('div');
+            tag.className = 'launch-tag';
+            tag.textContent = launch.launch_service_provider?.abbrev || launch.launch_service_provider?.name || '';
+            tag.style.opacity = fadeStates[i] ? '0.2' : '1';
+            hitbox.appendChild(tag);
+            // Add click events to hitbox (removed hover events)
+            hitbox.addEventListener('click', (e) => this.showLaunchDetails(launch, e));
+            // Handle wheel events on plot points to prevent panning
+            hitbox.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const rect = hitbox.getBoundingClientRect();
+                const canvasRect = this.elements.timelineCanvas.getBoundingClientRect();
+                const mouseX = rect.left + rect.width / 2 - canvasRect.left;
+                this.isDragging = false;
+                this.panHistory = [];
+                this.panMomentum.inProgress = false;
+                this.justZoomed = true;
+                const delta = e.deltaY > 0 ? 1.1 : 0.9;
+                this.zoomAtPoint(mouseX, delta);
+            }, { passive: false });
+            this.elements.launchPoints.appendChild(hitbox);
         });
     }
 
@@ -1134,17 +1157,20 @@ class SpaceflightTimeline {
         
         card.innerHTML = `
             <div class="mission-name">${launch.mission?.name || 'Mission TBD'}</div>
-            <div class="launch-date">${this.formatDate(launchDate)}</div>
+            <div class="launch-date"><span>${this.formatDate(launchDate)}</span> <span style="color:#00d4ff;">${this.formatTime(launchDate)}</span></div>
             <div class="agency-name">${launch.launch_service_provider?.name || 'Unknown Agency'}</div>
+            <div class="t0-countdown" style="margin-top:8px;font-family:'Orbitron',monospace;font-size:1.1em;color:#00d4ff;font-weight:700;"></div>
         `;
         
-        // Position the card above the plot point (centered on the hitbox, not the mouse)
+        // Calculate the position of the launch point
+        const launchDateObj = new Date(launch.net);
+        const x = this.timeToPixel(launchDateObj);
+        
+        // Position the card above the plot point
         const canvasRect = this.elements.timelineCanvas.getBoundingClientRect();
         const axis = this.elements.timelineAxis;
         const axisRect = axis.getBoundingClientRect();
-        const hitboxRect = event.currentTarget.getBoundingClientRect();
-        // X position: center of hitbox relative to canvas
-        const x = (hitboxRect.left + hitboxRect.right) / 2 - canvasRect.left;
+        
         // The axis Y position relative to the canvas
         const axisY = axisRect.top - canvasRect.top + axisRect.height / 2;
         // Place card so its bottom is above the axis, with a gap
@@ -1156,20 +1182,73 @@ class SpaceflightTimeline {
         card.classList.add('active');
         // Store the current launch for tracking
         this.currentHoverLaunch = launch;
+
+        // --- T-0 Countdown ---
+        if (this.hoverCountdownTimer) {
+            clearTimeout(this.hoverCountdownTimer);
+            this.hoverCountdownTimer = null;
+        }
+        const countdownElem = card.querySelector('.t0-countdown');
+        let lastCountdownStr = '';
+        const updateCountdown = () => {
+            const now = new Date();
+            const diff = launchDateObj - now;
+            // Remove countdown if more than 1 hour past launch
+            if (now - launchDateObj > 60 * 60 * 1000) {
+                countdownElem.textContent = '';
+                return;
+            }
+            if (isNaN(diff)) {
+                countdownElem.textContent = '';
+                return;
+            }
+            let prefix = 'T';
+            let absDiff = Math.abs(diff);
+            let sign = diff < 0 ? '+' : '-';
+            const days = Math.floor(absDiff / (24*60*60*1000));
+            const hours = Math.floor((absDiff % (24*60*60*1000)) / (60*60*1000));
+            const mins = Math.floor((absDiff % (60*60*1000)) / (60*1000));
+            const secs = Math.floor((absDiff % (60*1000)) / 1000);
+            let str = `${prefix}${sign}`;
+            if (days > 0) str += `${days}d `;
+            str += `${hours.toString().padStart(2,'0')}:`;
+            str += `${mins.toString().padStart(2,'0')}:`;
+            str += `${secs.toString().padStart(2,'0')}`;
+            if (str !== lastCountdownStr) {
+                countdownElem.textContent = str;
+                lastCountdownStr = str;
+            }
+            this.hoverCountdownTimer = setTimeout(updateCountdown, 250);
+        };
+        updateCountdown();
     }
 
     hideHoverCard() {
         this.elements.hoverCard.classList.remove('active');
         this.currentHoverLaunch = null;
+        // Remove hover class from all points
+        const hitboxes = this.elements.launchPoints.querySelectorAll('.launch-point-hitbox');
+        hitboxes.forEach(hitbox => {
+            const point = hitbox.querySelector('.launch-point');
+            if (point) {
+                point.classList.remove('hovered');
+            }
+        });
+        // Stop countdown timer
+        if (this.hoverCountdownTimer) {
+            clearTimeout(this.hoverCountdownTimer);
+            this.hoverCountdownTimer = null;
+        }
     }
 
-    showLaunchDetails(launch) {
+    showLaunchDetails(launch, event) {
         this.selectedLaunch = launch;
         this.elements.detailsTitle.textContent = launch.mission?.name || 'Launch Details';
-        
         const launchDate = new Date(launch.net);
         const statusClass = this.getStatusClass(launch.status?.name);
-        
+        // Determine if countdown should be shown
+        const now = new Date();
+        const showCountdown = (now - launchDate <= 60 * 60 * 1000);
         this.elements.detailsContent.innerHTML = `
             <div class="detail-item">
                 <div class="detail-label">Mission Name</div>
@@ -1177,8 +1256,14 @@ class SpaceflightTimeline {
             </div>
             <div class="detail-item">
                 <div class="detail-label">Launch Date</div>
-                <div class="detail-value">${this.formatDate(launchDate)} at ${this.formatTime(launchDate)}</div>
+                <div class="detail-value"><span>${this.formatDate(launchDate)}</span> <span style="color:#00d4ff;">${this.formatTime(launchDate)}</span></div>
             </div>
+            ${showCountdown ? `
+            <div class="detail-item">
+                <div class="detail-label">T-0 Countdown</div>
+                <div class="detail-value"><span class="details-t0-countdown" style="font-family:'Orbitron',monospace;font-size:1.1em;color:#00d4ff;font-weight:700;"></span></div>
+            </div>
+            ` : ''}
             <div class="detail-item">
                 <div class="detail-label">Launch Service Provider</div>
                 <div class="detail-value">${launch.launch_service_provider?.name || 'Unknown'}</div>
@@ -1215,12 +1300,102 @@ class SpaceflightTimeline {
             ` : ''}
         `;
 
+        // Position the modal to the left of the clicked point
+        if (event) {
+            const canvasRect = this.elements.timelineCanvas.getBoundingClientRect();
+            const hitboxRect = event.currentTarget.getBoundingClientRect();
+            const modal = this.elements.launchDetails;
+            const modalWidth = 500; // Approximate modal width
+            const gap = 20; // Gap between point and modal
+            // Calculate position to the left of the point
+            const pointX = hitboxRect.left + hitboxRect.width / 2;
+            const modalLeft = pointX - modalWidth - gap;
+            // Ensure modal doesn't go off-screen to the left
+            const finalLeft = Math.max(20, modalLeft);
+            modal.style.left = `${finalLeft}px`;
+            modal.style.top = '50%';
+            modal.style.transform = 'translateY(-50%)';
+        }
         this.elements.launchDetails.classList.add('active');
+        // Add click-outside-to-close functionality
+        this.addClickOutsideListener();
+
+        // --- T-0 Countdown for modal ---
+        if (this.detailsCountdownTimer) {
+            clearTimeout(this.detailsCountdownTimer);
+            this.detailsCountdownTimer = null;
+        }
+        if (showCountdown) {
+            const countdownElem = this.elements.detailsContent.querySelector('.details-t0-countdown');
+            let lastCountdownStr = '';
+            const updateCountdown = () => {
+                const now = new Date();
+                const diff = launchDate - now;
+                // Remove countdown if more than 1 hour past launch
+                if (now - launchDate > 60 * 60 * 1000) {
+                    countdownElem.textContent = '';
+                    return;
+                }
+                if (isNaN(diff)) {
+                    countdownElem.textContent = '';
+                    return;
+                }
+                let prefix = 'T';
+                let absDiff = Math.abs(diff);
+                let sign = diff < 0 ? '+' : '-';
+                const days = Math.floor(absDiff / (24*60*60*1000));
+                const hours = Math.floor((absDiff % (24*60*60*1000)) / (60*60*1000));
+                const mins = Math.floor((absDiff % (60*60*1000)) / (60*1000));
+                const secs = Math.floor((absDiff % (60*1000)) / 1000);
+                let str = `${prefix}${sign}`;
+                if (days > 0) str += `${days}d `;
+                str += `${hours.toString().padStart(2,'0')}:`;
+                str += `${mins.toString().padStart(2,'0')}:`;
+                str += `${secs.toString().padStart(2,'0')}`;
+                if (str !== lastCountdownStr) {
+                    countdownElem.textContent = str;
+                    lastCountdownStr = str;
+                }
+                this.detailsCountdownTimer = setTimeout(updateCountdown, 250);
+            };
+            updateCountdown();
+        }
     }
 
     closeDetails() {
         this.elements.launchDetails.classList.remove('active');
         this.selectedLaunch = null;
+        this.removeClickOutsideListener();
+        // Stop details countdown timer
+        if (this.detailsCountdownTimer) {
+            clearTimeout(this.detailsCountdownTimer);
+            this.detailsCountdownTimer = null;
+        }
+    }
+
+    addClickOutsideListener() {
+        // Remove any existing listener first
+        this.removeClickOutsideListener();
+        
+        // Add new listener
+        this.clickOutsideListener = (e) => {
+            const modal = this.elements.launchDetails;
+            if (modal.classList.contains('active') && !modal.contains(e.target)) {
+                this.closeDetails();
+            }
+        };
+        
+        // Add listener with a small delay to prevent immediate closure
+        setTimeout(() => {
+            document.addEventListener('click', this.clickOutsideListener);
+        }, 100);
+    }
+
+    removeClickOutsideListener() {
+        if (this.clickOutsideListener) {
+            document.removeEventListener('click', this.clickOutsideListener);
+            this.clickOutsideListener = null;
+        }
     }
 
     handleWheel(event) {
@@ -1386,6 +1561,70 @@ class SpaceflightTimeline {
         if (this.panHistory.length > 10) this.panHistory.shift();
     }
 
+    // New method to handle mouse movement and detect closest launch point
+    handleTimelineMouseMove(event) {
+        if (this.isDragging || this.justZoomed || this.wheelEventInProgress) {
+            return;
+        }
+
+        const canvasRect = this.elements.timelineCanvas.getBoundingClientRect();
+        const mouseX = event.clientX - canvasRect.left;
+        const mouseY = event.clientY - canvasRect.top;
+
+        // Get all visible launch hitboxes
+        const hitboxes = this.elements.launchPoints.querySelectorAll('.launch-point-hitbox');
+        let closestLaunch = null;
+        let closestDistance = Infinity;
+        let closestHitbox = null;
+
+        // Remove hover class from all points first
+        hitboxes.forEach(hitbox => {
+            const point = hitbox.querySelector('.launch-point');
+            if (point) {
+                point.classList.remove('hovered');
+            }
+        });
+
+        hitboxes.forEach(hitbox => {
+            const hitboxRect = hitbox.getBoundingClientRect();
+            const hitboxCenterX = hitboxRect.left + hitboxRect.width / 2 - canvasRect.left;
+            const hitboxCenterY = hitboxRect.top + hitboxRect.height / 2 - canvasRect.top;
+
+            // Check if mouse is within the hitbox
+            const isInHitbox = mouseX >= hitboxRect.left - canvasRect.left && 
+                              mouseX <= hitboxRect.right - canvasRect.left &&
+                              mouseY >= hitboxRect.top - canvasRect.top && 
+                              mouseY <= hitboxRect.bottom - canvasRect.top;
+
+            if (isInHitbox) {
+                // Calculate distance to center of hitbox
+                const distance = Math.sqrt(
+                    Math.pow(mouseX - hitboxCenterX, 2) + 
+                    Math.pow(mouseY - hitboxCenterY, 2)
+                );
+
+                if (distance < closestDistance) {
+                    closestDistance = distance;
+                    // Get the launch data directly from the dataset
+                    const launchData = hitbox.dataset.launchData;
+                    closestLaunch = launchData ? JSON.parse(launchData) : null;
+                    closestHitbox = hitbox;
+                }
+            }
+        });
+
+        // Show hover card for closest launch and add hover class
+        if (closestLaunch && closestHitbox) {
+            this.showHoverCard(event, closestLaunch);
+            const point = closestHitbox.querySelector('.launch-point');
+            if (point) {
+                point.classList.add('hovered');
+            }
+        } else {
+            this.hideHoverCard();
+        }
+    }
+
     handleMouseUp() {
         if (this.isDragging) {
             // Calculate velocity over last 50ms
@@ -1507,35 +1746,36 @@ class SpaceflightTimeline {
     }
 
     formatDate(date) {
-        return date.toLocaleDateString('en-US', {
-            weekday: 'short',
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric'
-        });
+        if (!date) return '';
+        let options = { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' };
+        let timeZone = this.selectedTimeZone === 'local' ? undefined : this.selectedTimeZone;
+        return new Intl.DateTimeFormat('en-US', { ...options, timeZone }).format(date);
     }
 
     formatTime(date, format = 'default') {
+        if (!date) return '';
+        let timeZone = this.selectedTimeZone === 'local' ? undefined : this.selectedTimeZone;
         switch (format) {
             case 'decade':
                 return Math.floor(date.getFullYear() / 10) * 10 + 's';
             case 'year':
                 return date.getFullYear().toString();
             case 'month':
-                return date.toLocaleDateString('en-US', { month: 'short' });
+                return date.toLocaleDateString('en-US', { month: 'short', timeZone });
             case 'day':
-                return date.getDate().toString();
+                return date.toLocaleDateString('en-US', { day: 'numeric', timeZone });
             case 'hour':
-                return date.toLocaleTimeString('en-US', { hour: '2-digit', hour12: false });
+                return date.toLocaleTimeString('en-US', { hour: '2-digit', hour12: false, timeZone });
             case 'minute':
-                return date.toLocaleTimeString('en-US', { minute: '2-digit' });
+                return date.toLocaleTimeString('en-US', { minute: '2-digit', timeZone });
             case 'second':
-                return date.getSeconds().toString().padStart(2, '0');
+                return date.toLocaleTimeString('en-US', { second: '2-digit', timeZone });
             default:
                 return date.toLocaleTimeString('en-US', {
                     hour: '2-digit',
                     minute: '2-digit',
-                    timeZoneName: 'short'
+                    timeZoneName: 'short',
+                    timeZone
                 });
         }
     }
